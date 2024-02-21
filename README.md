@@ -1,4 +1,21 @@
 # GoServe
+Work in progress! The only directory that is correct currently is content_server, which could be more appropriately named app_server.
+
+General Golang backend server designed to be generally extensible for building web apps.
+
+Specs:
+- Front end
+    - windmill-dashboard-master template
+    - htmx
+    - alpine.js
+- Back end
+    - golang
+    - echo
+    - postgres
+    - python (for model serving)
+
+
+
 # create your postgres instance
 `docker run --name my-shades-postgres -e POSTGRES_PASSWORD=mysecretpassword -d -p 5432:5432 postgres`
 
