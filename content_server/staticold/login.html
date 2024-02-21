@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Authentication</title>
+    <!-- Include any additional CSS here -->
+</head>
+<body>
+
+    <div id="auth-container">
+
+        <!-- Sign-Up Form -->
+        <div id="signup-form">
+            <h2>Sign Up</h2>
+            <form hx-post="http://localhost:8080/create_user" hx-target="#response" hx-swap="outerHTML" hx-indicator="#signup-indicator">
+                <div>
+                    <label for="username-signup">Username:</label>
+                    <input type="text" id="username-signup" name="username" required>
+                </div>
+                <div>
+                    <label for="password-signup">Password:</label>
+                    <input type="password" id="password-signup" name="password" required>
+                </div>
+                <button type="submit">Sign Up</button>
+                <div id="signup-indicator" style="display: none;">Creating user...</div>
+            </form>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form">
+            <h2>Login</h2>
+            <form hx-post="http://localhost:8080/login" hx-target="#response" hx-swap="outerHTML" hx-indicator="#login-indicator">
+                <div>
+                    <label for="username-login">Username:</label>
+                    <input type="text" id="username-login" name="username" required>
+                </div>
+                <div>
+                    <label for="password-login">Password:</label>
+                    <input type="password" id="password-login" name="password" required>
+                </div>
+                <button type="submit">Login</button>
+                <div id="login-indicator" style="display: none;">Logging in...</div>
+            </form>
+        </div>
+
+        <!-- Response Div -->
+        <div id="response"></div>
+
+    </div>
+
+    <!-- Include HTMX -->
+    <script src="https://unpkg.com/htmx.org"></script>
+
+    <script>
+        // Listen for htmx:beforeRequest and htmx:afterRequest events to handle indicators
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            var indicatorId = event.target.getAttribute('hx-indicator');
+            if(indicatorId) {
+                document.querySelector(indicatorId).style.display = 'block';
+            }
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            var indicatorId = event.target.getAttribute('hx-indicator');
+            if(indicatorId) {
+                document.querySelector(indicatorId).style.display = 'none';
+            }
+        });
+
+        document.body.addEventListener('htmx:afterOnLoad', function(event) {
+            // Assuming your server sets a header or some other identifiable marker on successful form submission
+            if(event.detail.success) {
+                window.location.href = '/app'; // Redirect to the main application page
+            }
+        });
+    </script>
+
+</body>
+</html>

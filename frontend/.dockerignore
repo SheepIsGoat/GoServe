@@ -1,0 +1,7 @@
+*/docker
+*.env
+.git
+cloudformation.yaml
+docker-compose.yaml
+docker-task.sh
+Dockerfile
