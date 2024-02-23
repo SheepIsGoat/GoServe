@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/labstack/echo/v4"
 )
 
 // Structs
@@ -18,23 +17,10 @@ type PoolConfig struct {
 	ConnectTimeout   time.Duration
 }
 
-type UserAuth struct {
-	Email           string
-	Password        string
-	ConfirmPassword string
-	Consent         string
-}
-
 type PostgresContext struct {
 	pool *pgxpool.Pool
 	ctx  context.Context
 }
-
-var errorMessageTemplate = `
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-        <strong class="font-bold">Oops!</strong>
-        <span class="block sm:inline">%s</span>
-    </div>`
 
 // Connection pooling
 func getDefaultConfig() *PoolConfig {
@@ -81,20 +67,4 @@ func getConnectionPool(config *PoolConfig) (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
-}
-
-func getUser(c echo.Context) UserAuth {
-	return UserAuth{
-		c.FormValue("email"),
-		c.FormValue("password"),
-		c.FormValue("confirm-password"),
-		c.FormValue("privacy-consent"),
-	}
-}
-
-func getUserPwd(user UserAuth, pgContext *PostgresContext) (string, error) {
-	var realPwd string
-	const query = "SELECT password FROM users WHERE email = $1"
-	err := pgContext.pool.QueryRow(pgContext.ctx, query, user.Email).Scan(&realPwd)
-	return realPwd, err
 }

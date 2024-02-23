@@ -3,16 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	// echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/labstack/echo/v4"
-
-	"github.com/asaskevich/govalidator"
 )
 
 // Output is a generic struct for handling results and errors.
@@ -61,7 +59,6 @@ func JWTFromCookie() echo.MiddlewareFunc {
 
 			if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				c.Set("user", token)
-				log.Printf("Cookie is fine\n")
 				return next(c)
 			} else {
 				return c.Redirect(http.StatusFound, "/login")
@@ -126,7 +123,7 @@ func jwtClaimsMiddleware(sMap ValidationMap[string], fMap ValidationMap[float64]
 }
 
 var strClaimsValidation = ValidationMap[string]{
-	"Email":  {Func: validateEmail, Required: true},
+	"ID":     {Func: validateUUID, Required: true},
 	"Issuer": {Func: validateIssuer, Required: true},
 }
 
@@ -134,18 +131,33 @@ var f64ClaimsValidation = ValidationMap[float64]{
 	"exp": {Func: validateExpiry, Required: true},
 }
 
-func validateEmail(email string) error {
-	limit := 32
-	if len(email) > limit {
-		message := fmt.Sprintf("Email too long. %v > %v", len(email), limit)
-		return NewClaimsError("email", message)
+func validateUUID(uuid string) error {
+	if len(uuid) != 36 {
+		message := fmt.Sprintf("Invalid ID length: %v. Expected length is 36.", len(uuid))
+		return NewClaimsError("ID", message)
 	}
-	if !govalidator.IsEmail(email) {
-		message := fmt.Sprintf("Not a valid email address: %v", email)
-		return NewClaimsError("email", message)
+
+	uidRegex := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	if !uidRegex.MatchString(uuid) {
+		message := fmt.Sprintf("Invalid UUID format: %v", uuid)
+		return NewClaimsError("ID", message)
 	}
+
 	return nil
 }
+
+// func validateEmail(email string) error {
+// 	limit := 32
+// 	if len(email) > limit {
+// 		message := fmt.Sprintf("Email too long. %v > %v", len(email), limit)
+// 		return NewClaimsError("email", message)
+// 	}
+// 	if !govalidator.IsEmail(email) {
+// 		message := fmt.Sprintf("Not a valid email address: %v", email)
+// 		return NewClaimsError("email", message)
+// 	}
+// 	return nil
+// }
 
 func validateExpiry(exp float64) error {
 	expTime := time.Unix(int64(exp), 0)

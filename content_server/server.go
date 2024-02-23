@@ -49,8 +49,8 @@ func main() {
 	}).Name = "login"
 
 	e.POST("/login/", func(c echo.Context) error {
-		pgContext := PostgresContext{pool, context.Background()}
-		err := loginEndpoint(c, &pgContext)
+		hCtx := HandlerContext{c, &PostgresContext{pool, context.Background()}}
+		err := hCtx.loginEndpoint()
 		if err != nil {
 			return err
 		}
@@ -64,8 +64,8 @@ func main() {
 	}).Name = "create-account"
 
 	e.POST("/create-account/", func(c echo.Context) error {
-		pgContext := PostgresContext{pool, context.Background()}
-		return createAccount(c, &pgContext)
+		hCtx := HandlerContext{c, &PostgresContext{pool, context.Background()}}
+		return hCtx.createAccount()
 	})
 
 	app := e.Group("/app")
