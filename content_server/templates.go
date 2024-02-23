@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"path/filepath"
 
 	"github.com/labstack/echo/v4"
 )
@@ -44,4 +45,14 @@ func RenderTemplate(
 	}
 
 	return tmpl.ExecuteTemplate(c.Response().Writer, outerHtml+".html", data)
+}
+
+func serveFile(c echo.Context, filename string) error {
+	err := c.File(filepath.Join(StaticPath, filename))
+	if err != nil {
+		log.Printf("Error serving file %s: %v", filename, err)
+		return err
+	}
+	log.Printf("I'm serving the file %s", filename)
+	return nil
 }

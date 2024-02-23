@@ -49,9 +49,8 @@ func main() {
 	}).Name = "login"
 
 	e.POST("/login/", func(c echo.Context) error {
-		user := getUser(c)
 		pgContext := PostgresContext{pool, context.Background()}
-		err := loginEndpoint(c, user, &pgContext)
+		err := loginEndpoint(c, &pgContext)
 		if err != nil {
 			return err
 		}
@@ -65,9 +64,8 @@ func main() {
 	}).Name = "create-account"
 
 	e.POST("/create-account/", func(c echo.Context) error {
-		user := getUser(c)
 		pgContext := PostgresContext{pool, context.Background()}
-		return createAccount(c, user, &pgContext)
+		return createAccount(c, &pgContext)
 	})
 
 	app := e.Group("/app")
@@ -78,20 +76,15 @@ func main() {
 	app.GET("/", func(c echo.Context) error {
 		// pgContext := PostgresContext{pool, context.Background()}
 		data := map[string]interface{}{}
-		return RenderTemplate(c, http.StatusOK, "app.html", "dashboard", data)
+		return RenderTemplate(c, http.StatusOK, "app", "dashboard", data)
 	})
-
-	serveFile := func(c echo.Context, filename string) error {
-		err := c.File(filepath.Join(StaticPath, filename))
-		if err != nil {
-			log.Printf("Error serving file %s: %v", filename, err)
-			return err
-		}
-		return nil
-	}
 
 	app.GET("/dashboard/", func(c echo.Context) error {
 		return serveFile(c, "dashboard.html")
+	}).Name = "index"
+
+	app.GET("/files/", func(c echo.Context) error {
+		return serveFile(c, "files.html")
 	}).Name = "index"
 
 	app.GET("/forms/", func(c echo.Context) error {
