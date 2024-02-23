@@ -50,7 +50,7 @@ func JWTFromCookie() echo.MiddlewareFunc {
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
 				return jwtSecret, nil
 			})
@@ -163,9 +163,6 @@ func validateIssuer(issuer string) error {
 	}
 	return nil
 }
-
-// // Time format to use for parsing
-var timeFormat = "2006-01-02T15:04:05.999999999-07:00"
 
 // PgxPoolMiddleware injects a Postgres connection pool into the Echo context.
 func PgxPoolMiddleware(pool *pgxpool.Pool) echo.MiddlewareFunc {

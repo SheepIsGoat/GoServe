@@ -125,6 +125,9 @@ func newContent(qContext *newContentT) ([]newContentRow, error) {
 	return queryNewContent(qContext, timeObj)
 }
 
+// // Time format to use for parsing
+var timeFormat = "2006-01-02T15:04:05.999999999-07:00"
+
 func parseTimeNewContent(timeStr string, endpoint string) (time.Time, error) {
 	timeObj, err := time.Parse(timeFormat, timeStr)
 	if err != nil {

@@ -58,7 +58,6 @@ func main() {
 
 		c.Response().Header().Set("HX-Redirect", "/app/")
 		return c.NoContent(http.StatusOK)
-		// return c.Redirect(http.StatusFound, "/app/")
 	})
 
 	e.GET("/create-account/", func(c echo.Context) error {
@@ -79,14 +78,8 @@ func main() {
 	app.GET("/", func(c echo.Context) error {
 		// pgContext := PostgresContext{pool, context.Background()}
 		data := map[string]interface{}{}
-		return RenderTemplate(c, http.StatusOK, "app", "dashboard", data)
-		// c.Render(http.StatusOK, "outer.html", map[string]interface{}{})
+		return RenderTemplate(c, http.StatusOK, "app.html", "dashboard", data)
 	})
-
-	// app.GET("/404/", func(c echo.Context) error {
-	// 	data := map[string]interface{}{}
-	// 	return RenderTemplate(c, http.StatusOK, "404", data)
-	// }).Name = "404"
 
 	serveFile := func(c echo.Context, filename string) error {
 		err := c.File(filepath.Join(StaticPath, filename))
@@ -125,18 +118,8 @@ func main() {
 		return serveFile(c, "tables.html")
 	}).Name = "index"
 
-	// r := e.Group("/content")
-	// r.Use(echojwt.JWT(jwtSecret))
-	// r.Use(jwtClaimsMiddleware(strClaimsValidation, f64ClaimsValidation))
-	// r.Use(PgxPoolMiddleware(pool))
-	// r.GET("/new", func(c echo.Context) error {
-	// 	pgContext := PostgresContext{pool, context.Background()}
-	// 	return newContentHandler(c, pgContext)
-	// })
-
 	e.Static("/assets", AssetsPath)
 	app.Static("/assets", AssetsPath)
-	// app.Static("/", static)
 
 	e.Logger.Fatal(e.Start(":8080"))
 }

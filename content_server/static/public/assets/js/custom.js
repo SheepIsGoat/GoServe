@@ -24,19 +24,6 @@ function toggleIndicator(clickedAnchor) {
         }
     });
 
-    // Show the indicator for the clicked item and update its <a> tag's class
-    // const clickedItem = document.getElementById(clickedItemId);
-    // if (clickedItem) {
-    //     const indicatorSpan = clickedItem.querySelector('.indicator');
-    //     const anchor = clickedItem.querySelector('a');
-    //     if (indicatorSpan && anchor) {
-    //         indicatorSpan.classList.remove('hidden');
-    //         anchor.className = activeClass;
-    //     }
-    // } else {
-    //     console.error('Clicked item not found:', clickedItemId);
-    // }
-
     const listItem = clickedAnchor.closest('li');
     if (listItem) {
         const indicatorSpan = listItem.querySelector('.indicator');
