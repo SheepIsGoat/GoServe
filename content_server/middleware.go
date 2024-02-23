@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -21,7 +22,7 @@ type Output[T any] struct {
 }
 
 // ValidatorFunc is a type for validation functions.
-type ValidatorFunc[T any] func(T) (error)
+type ValidatorFunc[T any] func(T) error
 
 // ValidatorEntry is a struct to handle validation function and its required status.
 type ValidatorEntry[T any] struct {
@@ -38,58 +39,51 @@ func NewClaimsError(key string, message string) error {
 }
 
 func JWTFromCookie() echo.MiddlewareFunc {
-    return func(next echo.HandlerFunc) echo.HandlerFunc {
-        return func(c echo.Context) error {
-            cookie, err := c.Cookie("auth_token")
-            if err != nil {
-                if err == http.ErrNoCookie {
-                    return c.String(http.StatusUnauthorized, "No token in cookie")
-                }
-                return err
-            }
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			cookie, err := c.Cookie("auth_token")
+			if err != nil {
+				return c.Redirect(http.StatusFound, "/login")
+			}
 
-            tokenString := cookie.Value
-            token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-                // Don't forget to validate the alg is what you expect:
-                if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-                    return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-                }
-                return jwtSecret, nil
-            })
+			tokenString := cookie.Value
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				// Don't forget to validate the alg is what you expect:
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				}
+				return jwtSecret, nil
+			})
 
-            if err != nil {
-                return c.String(http.StatusUnauthorized, "Invalid token")
-            }
+			if err != nil {
+				return c.Redirect(http.StatusFound, "/login")
+			}
 
-            if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-                c.Set("user", token)
-                return next(c)
-            } else {
-                return c.String(http.StatusUnauthorized, "Invalid token")
-            }
-        }
-    }
+			if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+				c.Set("user", token)
+				log.Printf("Cookie is fine\n")
+				return next(c)
+			} else {
+				return c.Redirect(http.StatusFound, "/login")
+			}
+		}
+	}
 }
-
 
 // jwtClaimsMiddleware handles the JWT claims validation using a ValidationMap.
 func jwtClaimsMiddleware(sMap ValidationMap[string], fMap ValidationMap[float64]) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			fmt.Printf("c.Get(\"user\"): %v\n", c.Get("user"))
-
-
-
 
 			unJwt, ok := c.Get("user").(*jwt.Token)
 			// unJwt, ok := c.Cookie("auth_token")
 			if !ok {
-				return c.String(http.StatusUnauthorized, "Invalid token")
+				return c.Redirect(http.StatusFound, "/login")
 			}
 
 			claims, ok := unJwt.Claims.(jwt.MapClaims)
 			if !ok {
-				return c.String(http.StatusUnauthorized, "Invalid claims format")
+				return c.Redirect(http.StatusFound, "/login")
 			}
 
 			for claim, entry := range sMap {
@@ -97,14 +91,14 @@ func jwtClaimsMiddleware(sMap ValidationMap[string], fMap ValidationMap[float64]
 
 				if !ok {
 					if entry.Required {
-						return c.String(http.StatusUnauthorized, fmt.Sprintf("%s not found in token", claim))
+						return c.Redirect(http.StatusFound, "/login")
 					}
 					continue // Skip validation for optional, missing claims
 				}
 
 				err := entry.Func(claimValue)
 				if err != nil {
-					return c.String(http.StatusUnauthorized, err.Error())
+					return c.Redirect(http.StatusFound, "/login")
 				}
 				c.Set(claim, claimValue)
 			}
@@ -114,14 +108,14 @@ func jwtClaimsMiddleware(sMap ValidationMap[string], fMap ValidationMap[float64]
 
 				if !ok {
 					if entry.Required {
-						return c.String(http.StatusUnauthorized, fmt.Sprintf("%s not found in token", claim))
+						return c.Redirect(http.StatusFound, "/login")
 					}
 					continue // Skip validation for optional, missing claims
 				}
 
 				err := entry.Func(claimValue)
 				if err != nil {
-					return c.String(http.StatusUnauthorized, err.Error())
+					return c.Redirect(http.StatusFound, "/login")
 				}
 				c.Set(claim, claimValue)
 			}
@@ -131,19 +125,16 @@ func jwtClaimsMiddleware(sMap ValidationMap[string], fMap ValidationMap[float64]
 	}
 }
 
-
 var strClaimsValidation = ValidationMap[string]{
-	"Email": {Func: validateEmail, Required: true},
-	"Issuer":     {Func: validateIssuer, Required: true},
+	"Email":  {Func: validateEmail, Required: true},
+	"Issuer": {Func: validateIssuer, Required: true},
 }
 
 var f64ClaimsValidation = ValidationMap[float64]{
-	"exp":     {Func: validateExpiry, Required: true},
+	"exp": {Func: validateExpiry, Required: true},
 }
 
-
-
-func validateEmail(email string) (error) {
+func validateEmail(email string) error {
 	limit := 32
 	if len(email) > limit {
 		message := fmt.Sprintf("Email too long. %v > %v", len(email), limit)
@@ -156,7 +147,7 @@ func validateEmail(email string) (error) {
 	return nil
 }
 
-func validateExpiry(exp float64) (error) {
+func validateExpiry(exp float64) error {
 	expTime := time.Unix(int64(exp), 0)
 	if time.Now().After(expTime) {
 		message := fmt.Sprintf("JWT expired: %v < %v", expTime, time.Now())
@@ -165,7 +156,7 @@ func validateExpiry(exp float64) (error) {
 	return nil
 }
 
-func validateIssuer(issuer string) (error) {
+func validateIssuer(issuer string) error {
 	if issuer != "ResumeSheep" {
 		message := fmt.Sprintf("Invalid JWT issuer: %v != %v", issuer, "ResumeSheep")
 		return NewClaimsError("Issuer", message)
@@ -173,32 +164,8 @@ func validateIssuer(issuer string) (error) {
 	return nil
 }
 
-
 // // Time format to use for parsing
 var timeFormat = "2006-01-02T15:04:05.999999999-07:00"
-//
-// // validateTime validates if the time is within a 24-hour range.
-// func validateTime(timeStr string) (string, error) {
-// 	parsedTime, err := time.Parse(timeFormat, timeStr)
-// 	if err != nil {
-// 		message := "Could not parse time"
-// 		return timeStr, NewClaimsError(timeStr, message)
-// 	}
-// 	if !isTimeWithin24Hours(parsedTime) {
-// 		message := "Time out of bounds"
-// 		return timeStr, NewClaimsError(timeStr, message)
-// 	}
-// 	return timeStr, nil
-// }
-
-// // isTimeWithin24Hours checks if the time is within the past 24 hours.
-// func isTimeWithin24Hours(parsedTime time.Time) bool {
-// 	currentTime := time.Now()
-// 	twentyFourHoursAgo := currentTime.Add(-24 * time.Hour)
-// 	twentyFourHoursFromNow := currentTime.Add(24 * time.Hour)
-
-// 	return parsedTime.After(twentyFourHoursAgo) && parsedTime.Before(twentyFourHoursFromNow)
-// }
 
 // PgxPoolMiddleware injects a Postgres connection pool into the Echo context.
 func PgxPoolMiddleware(pool *pgxpool.Pool) echo.MiddlewareFunc {
@@ -214,5 +181,37 @@ func PgxPoolMiddleware(pool *pgxpool.Pool) echo.MiddlewareFunc {
 
 			return next(c)
 		}
+	}
+}
+
+func customHTTPErrorHandler(err error, c echo.Context) {
+	code := http.StatusInternalServerError
+	if he, ok := err.(*echo.HTTPError); ok {
+		code = he.Code
+	}
+	c.Logger().Error(err)
+
+	_, cookieErr := c.Cookie("auth_token")
+	if cookieErr != nil {
+		c.Redirect(http.StatusFound, "/login")
+		return
+	}
+
+	messages := map[int]string{
+		404: "Page not found",
+		400: "Bad request",
+		401: "Unauthorized",
+		403: "Forbidden",
+		500: "Internal server error",
+		502: "Bad gateway",
+		503: "Service unavailable",
+	}
+
+	data := map[string]interface{}{
+		"ErrorCode":    code,
+		"ErrorMessage": messages[code],
+	}
+	if err := RenderTemplate(c, http.StatusOK, "app", "error", data); err != nil {
+		c.Logger().Error(err)
 	}
 }
