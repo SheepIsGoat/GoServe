@@ -1,11 +1,18 @@
 console.log('File loaded');
 
+
 document.body.addEventListener('htmx:load', function() {
     setupFileDropArea();
 });
 
+window.setupComplete = false
+
 function setupFileDropArea() {
-    console.log('Button clicked');
+    if (window.setupComplete) {
+        console.log("FleDropArea is already set up")
+        return
+    }
+    console.log('Setting up FileDropArea');
     var dropArea = document.getElementById('drop-area');
     if (!dropArea) {
         console.log("No drop area found")
@@ -18,10 +25,10 @@ function setupFileDropArea() {
     }
     var uploadButton = dropArea.querySelector('button');
 
-    // Open file selector when clicked on the button
-    uploadButton.addEventListener('click', function() {
+    uploadButton.addEventListener('click', function(){
         fileInput.click();
     });
+
 
     fileInput.addEventListener('change', function() {
         handleFiles(this.files);
@@ -67,13 +74,28 @@ function setupFileDropArea() {
     }
 
     function uploadFile(file) {
-        var url = '/upload';
+        var url = '/app/upload';
         var formData = new FormData();
         formData.append('file', file);
-
-        // Assuming you're using HTMX for the AJAX call
-        htmx.ajax('POST', url, formData, {
-            target: '#upload-status'
-        });
+    
+        // Using Fetch API as an alternative to HTMX for the AJAX call
+        fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.text();
+        }).then(html => {
+            // Update the target element with the response
+            var uploadStatus = document.querySelector('#upload-status');
+            uploadStatus.innerHTML = html;
+            setTimeout(function() { uploadStatus.innerHTML=""; }, 5000);
+        })
+        .catch(error => console.error(error));
     }
+    console.log("Finished setup")
+    window.setupComplete = true
 }

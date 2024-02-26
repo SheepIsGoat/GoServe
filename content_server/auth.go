@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"log"
+	pg "main/postgres"
 	"net/http"
 	"time"
 
@@ -51,7 +52,7 @@ func (hCtx *HandlerContext) validateSignup(user UserAuth) ([]byte, string, bool)
 
 	var exists bool
 	checkUserSql := `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)`
-	err := hCtx.PGCtx.pool.QueryRow(hCtx.PGCtx.ctx, checkUserSql, user.Email).Scan(&exists)
+	err := hCtx.PGCtx.Pool.QueryRow(hCtx.PGCtx.Ctx, checkUserSql, user.Email).Scan(&exists)
 	if err != nil {
 		log.Printf("Existing user check - query failed: %v for email %v. Error: %v", checkUserSql, user.Email, err)
 		return passHash, "Internal server error", notOk
@@ -70,7 +71,7 @@ func (hCtx *HandlerContext) validateSignup(user UserAuth) ([]byte, string, bool)
 	return passHash, "Success", ok
 }
 
-func (PGCtx *PostgresContext) insertAccount(user UserAuth, passHash []byte) error {
+func insertAccount(PGCtx *pg.PostgresContext, user UserAuth, passHash []byte) error {
 	encodedPassHash := base64.StdEncoding.EncodeToString(passHash)
 
 	uuid := uuid.New().String()
@@ -78,7 +79,7 @@ func (PGCtx *PostgresContext) insertAccount(user UserAuth, passHash []byte) erro
 	sqlStatement := `INSERT INTO users (id, email, password) VALUES ($1, $2, $3)`
 
 	// Execute the SQL statement with the desired values.
-	_, err := PGCtx.pool.Exec(PGCtx.ctx, sqlStatement, uuid, user.Email, encodedPassHash)
+	_, err := PGCtx.Pool.Exec(PGCtx.Ctx, sqlStatement, uuid, user.Email, encodedPassHash)
 	return err
 }
 
@@ -130,9 +131,9 @@ func setCookie(c echo.Context, uuid string) bool {
 	return true
 }
 
-func getUserPwd(user UserAuth, pgContext *PostgresContext) (string, string, error) {
+func getUserPwd(user UserAuth, pgContext *pg.PostgresContext) (string, string, error) {
 	var uuid, realPwd string
 	const query = "SELECT id, password FROM users WHERE email = $1"
-	err := pgContext.pool.QueryRow(pgContext.ctx, query, user.Email).Scan(&uuid, &realPwd)
+	err := pgContext.Pool.QueryRow(pgContext.Ctx, query, user.Email).Scan(&uuid, &realPwd)
 	return uuid, realPwd, err
 }

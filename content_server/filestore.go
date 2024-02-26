@@ -5,25 +5,30 @@ import (
 	"fmt"
 	"io"
 	"log"
+	pg "main/postgres"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/labstack/echo/v4"
 )
 
 // //
-type FileSystemConfig struct {
-	BucketDir string
-	Location  string
-}
 
 type Filesystem interface {
 	Write(file io.Reader, filename string) error
 	Delete(filename string) error
 	GetStorageClass() *StorageClass
+	GetLocation() string
 }
 
 type StorageClass struct {
 	Config FileSystemConfig
+}
+
+type FileSystemConfig struct {
+	BucketDir string
 }
 
 type FileInput struct {
@@ -41,10 +46,43 @@ type FileOutput struct {
 	RawText        string
 }
 
+func _createFileInput(c echo.Context) (FileInput, error) {
+	fileInput := FileInput{
+		Filename: "MyFile.txt",
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return fileInput, err
+	}
+	if file == nil {
+		return fileInput, echo.NewHTTPError(http.StatusBadRequest, "No file in request")
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return fileInput, err
+	}
+	defer src.Close()
+
+	fileInput.File = src
+
+	fileInput.RawText = c.FormValue("raw_text")
+
+	uuid, ok := c.Get("ID").(string)
+	if !ok {
+		return fileInput, echo.NewHTTPError(http.StatusUnauthorized, "User UUID not found in JWT claims")
+	}
+	fileInput.AccountUUID = uuid
+	return fileInput, nil
+}
+
 // Saving files
-func Save(pgContext *PostgresContext, filesystem Filesystem, fileInput FileInput) error {
+func SaveFile(pgContext *pg.PostgresContext, filesystem Filesystem, fileInput FileInput) error {
+	// Saves the file to disk on the filesystem of your choice, then indexes the result in postgres
 	fileOutput, buf, err := fileInput.createFileOutput()
 	if err != nil {
+		log.Printf("Failed to create FileOutput: %v", err)
 		return err
 	}
 
@@ -67,7 +105,7 @@ func (input FileInput) createFileOutput() (FileOutput, bytes.Buffer, error) {
 		return fileOutput, buf, fmt.Errorf("error reading file into buffer: %w", err)
 	}
 
-	ext, err := getFileExt(fileOutput.FileExt)
+	ext, err := getFileExt(input.Filename)
 	if err != nil {
 		return fileOutput, buf, err
 	}
@@ -81,16 +119,17 @@ func (input FileInput) createFileOutput() (FileOutput, bytes.Buffer, error) {
 				return fileOutput, buf, err
 			}
 		} else {
-			return fileOutput, buf, fmt.Errorf("Empty file and no raw text? There's nothing here!")
+			return fileOutput, buf, fmt.Errorf("empty file and no raw text? There's nothing here!")
 		}
 	}
 	fileOutput.RawText = rawText
 	return fileOutput, buf, nil
 }
 
-func (fo FileOutput) writeFile(pgContext *PostgresContext, filesystem Filesystem, buf bytes.Buffer) error {
+func (fo FileOutput) writeFile(pgContext *pg.PostgresContext, filesystem Filesystem, buf bytes.Buffer) error {
 	err := indexFile(pgContext, filesystem, fo)
 	if err != nil {
+		log.Printf("Error inserting file to table %v, %v", fo, err)
 		return err
 	}
 
@@ -118,7 +157,7 @@ func (input FileInput) getUniqueFilename(uploadTime int64) string {
 func getFileExt(filename string) (string, error) {
 	ext := filepath.Ext(filename)
 	if ext == "" {
-		return "", fmt.Errorf("file has no extension")
+		return "", fmt.Errorf("file has no extension: %s", filename)
 	}
 	return ext, nil
 }
@@ -138,7 +177,7 @@ func extractText(file io.Reader, ext string) (string, error) {
 	return "Extracted text", nil
 }
 
-func indexFile(pgContext *PostgresContext, filesystem Filesystem, details FileOutput) error {
+func indexFile(pgContext *pg.PostgresContext, filesystem Filesystem, details FileOutput) error {
 	storageClass := filesystem.GetStorageClass()
 	sqlStatement := `
 	INSERT INTO files (
@@ -150,8 +189,8 @@ func indexFile(pgContext *PostgresContext, filesystem Filesystem, details FileOu
 		bucket_dir, 
 		location
 	) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := pgContext.pool.Exec(
-		pgContext.ctx,
+	_, err := pgContext.Pool.Exec(
+		pgContext.Ctx,
 		sqlStatement,
 		details.UniqueFilename,
 		details.AccountUUID,
@@ -159,14 +198,14 @@ func indexFile(pgContext *PostgresContext, filesystem Filesystem, details FileOu
 		details.FileExt,
 		details.RawText,
 		storageClass.Config.BucketDir,
-		storageClass.Config.Location,
+		filesystem.GetLocation(),
 	)
 	return err
 }
 
-func deleteFileRecord(pgContext *PostgresContext, uniqueFilename string) error {
+func deleteFileRecord(pgContext *pg.PostgresContext, uniqueFilename string) error {
 	sqlStatement := `DELETE FROM files WHERE storage_filename = $1`
-	_, err := pgContext.pool.Exec(pgContext.ctx, sqlStatement, uniqueFilename)
+	_, err := pgContext.Pool.Exec(pgContext.Ctx, sqlStatement, uniqueFilename)
 	if err != nil {
 		return fmt.Errorf("error deleting file record: %w", err)
 	}
@@ -198,6 +237,10 @@ func (l *LocalStorage) Delete(filename string) error {
 
 func (l *LocalStorage) GetStorageClass() *StorageClass {
 	return &l.StorageClass
+}
+
+func (l *LocalStorage) GetLocation() string {
+	return "local"
 }
 
 type S3Storage struct {

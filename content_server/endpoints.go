@@ -2,18 +2,35 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
+	pg "main/postgres"
+	"main/tables"
+	"main/tables/rows"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
 
 type HandlerContext struct {
 	EchoCtx echo.Context
-	PGCtx   *PostgresContext
+	PGCtx   *pg.PostgresContext
 }
 
 func errorDiv(c echo.Context, message string) error {
+	errorMessageTemplate := `
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <strong class="font-bold">Oops!</strong>
+        <span class="block sm:inline">%s</span>
+    </div>`
+	errorMessage := fmt.Sprintf(errorMessageTemplate, message)
+	return c.HTML(http.StatusOK, errorMessage)
+}
+
+func successDiv(c echo.Context, message string) error {
 	errorMessageTemplate := `
     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
         <strong class="font-bold">Oops!</strong>
@@ -30,7 +47,7 @@ func (hCtx *HandlerContext) createAccount() error {
 		return errorDiv(hCtx.EchoCtx, msg)
 	}
 
-	err := hCtx.PGCtx.insertAccount(user, passHash)
+	err := insertAccount(hCtx.PGCtx, user, passHash)
 	if err != nil {
 		log.Print(err)
 		return errorDiv(hCtx.EchoCtx, "Failed to create new account")
@@ -57,44 +74,72 @@ func (hCtx *HandlerContext) loginEndpoint() error {
 	return nil
 }
 
-func (hCtx *HandlerContext) upload() error {
-	// NOT IMPLEMENTED - endpoint for uploading files to storage.
-	// Should use wrappers from filestore.go to abstract local vs S3 vs google etc
-	// Should use JWT claims + postgres user to store file pointers and verify permissions
-	// Also add in file parsers to extract raw text from
-
-	fs := LocalStorage{
-		Directory: "~/Documents/GoServer/filesystem",
+func (hCtx *HandlerContext) Upload() error {
+	fileInput, err := _createFileInput(hCtx.EchoCtx)
+	if err != nil {
+		log.Printf("Failed to parse file upload: %v", err)
 	}
 
-	// user := getUser(c)
-
-	file, err := hCtx.EchoCtx.FormFile("file")
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		log.Printf("Home directory not found")
 		return err
 	}
 
-	rawText, err := hCtx.EchoCtx.FormFile("raw_text")
-	if err != nil {
-		return err
+	filesystem := &LocalStorage{
+		StorageClass{
+			Config: FileSystemConfig{
+				BucketDir: filepath.Join(homeDir, "/Documents/GoServer/filesystem"),
+			},
+		},
 	}
 
-
-	src, err := file.Open()
+	err = SaveFile(hCtx.PGCtx, filesystem, fileInput)
 	if err != nil {
+		log.Printf("Failed to save file; %v", err)
+		return errorDiv(hCtx.EchoCtx, "Failed to upload file")
+	}
+	return successDiv(hCtx.EchoCtx, "Successfully uploaded file")
+}
+
+func (hCtx *HandlerContext) Table(tmpl *template.Template) error {
+	// tableName := hCtx.EchoCtx.QueryParam("tableName")
+	tableName := "Account Invoices"
+
+	itemsPerPageStr := hCtx.EchoCtx.QueryParam("itemsPerPage")
+	var err error
+	itemsPerPage := uint64(10)
+	if itemsPerPageStr != "" {
+		itemsPerPage, err = strconv.ParseUint(itemsPerPageStr, 10, 32)
+		if err != nil {
+			log.Printf("Could not get itemsPerPage for table %s: %v\n", tableName, err)
+			return err
+		}
+	}
+
+	currentPageStr := hCtx.EchoCtx.QueryParam("page")
+	currentPage := uint64(1)
+	if currentPageStr != "" {
+		currentPage, err = strconv.ParseUint(currentPageStr, 10, 32)
+		if err != nil {
+			log.Printf("Could not get currentPage for table %s: %v\n", tableName, err)
+		}
+	}
+
+	processor := &rows.AccountRowProcessor{}
+	totalRows, err := processor.Count(hCtx.PGCtx)
+	if err != nil {
+		log.Printf("Could not count rows for table %s: %v\n", tableName, err)
 		return err
 	}
-	defer src.Close()
+	table := tables.Table[rows.AccountRow]{}
+	table.Pagination.Init(
+		tableName,
+		uint32(totalRows),
+		uint32(currentPage),
+		uint32(itemsPerPage),
+		7,
+	)
 
-	Save(fs, rawText string, file io.Reader, filename string, pgContext *PostgresContext, uuid string)
-
-	// // Use the storage interface to save the file
-	// err = storage.Save(src, file.Filename)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Additional logic (if any)
-
-	// return nil
+	return table.RenderTable(hCtx.EchoCtx, hCtx.PGCtx, tmpl, processor)
 }

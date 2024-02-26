@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"html/template"
+	pg "main/postgres"
+	"main/templating"
 	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	// echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/labstack/echo/v4"
 )
@@ -181,9 +183,9 @@ func PgxPoolMiddleware(pool *pgxpool.Pool) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			ctx := context.Background()
-			pgContext := &PostgresContext{
-				pool: pool,
-				ctx:  ctx,
+			pgContext := &pg.PostgresContext{
+				Pool: pool,
+				Ctx:  ctx,
 			}
 
 			c.Set("pgContext", pgContext)
@@ -193,34 +195,36 @@ func PgxPoolMiddleware(pool *pgxpool.Pool) echo.MiddlewareFunc {
 	}
 }
 
-func customHTTPErrorHandler(err error, c echo.Context) {
-	code := http.StatusInternalServerError
-	if he, ok := err.(*echo.HTTPError); ok {
-		code = he.Code
-	}
-	c.Logger().Error(err)
-
-	_, cookieErr := c.Cookie("auth_token")
-	if cookieErr != nil {
-		c.Redirect(http.StatusFound, "/login")
-		return
-	}
-
-	messages := map[int]string{
-		404: "Page not found",
-		400: "Bad request",
-		401: "Unauthorized",
-		403: "Forbidden",
-		500: "Internal server error",
-		502: "Bad gateway",
-		503: "Service unavailable",
-	}
-
-	data := map[string]interface{}{
-		"ErrorCode":    code,
-		"ErrorMessage": messages[code],
-	}
-	if err := RenderTemplate(c, http.StatusOK, "app", "error", data); err != nil {
+func customHTTPErrorHandler(tmpl *template.Template) echo.HTTPErrorHandler {
+	return func(err error, c echo.Context) {
+		code := http.StatusInternalServerError
+		if he, ok := err.(*echo.HTTPError); ok {
+			code = he.Code
+		}
 		c.Logger().Error(err)
+
+		_, cookieErr := c.Cookie("auth_token")
+		if cookieErr != nil {
+			c.Redirect(http.StatusFound, "/login")
+			return
+		}
+
+		messages := map[int]string{
+			404: "Page not found",
+			400: "Bad request",
+			401: "Unauthorized",
+			403: "Forbidden",
+			500: "Internal server error",
+			502: "Bad gateway",
+			503: "Service unavailable",
+		}
+
+		data := map[string]interface{}{
+			"ErrorCode":    code,
+			"ErrorMessage": messages[code],
+		}
+		if err := templating.RenderTemplate(c, tmpl, "app", "error", data); err != nil {
+			c.Logger().Error(err)
+		}
 	}
 }

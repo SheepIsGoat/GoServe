@@ -1,3 +1,4 @@
+{{ define "app" }}
 <!DOCTYPE html>
 <html :class="{ 'theme-dark': dark }" x-data="data()" lang="en">
   <head>
@@ -913,7 +914,7 @@
 
 
         <div id="content-area" class="h-full pb-16 overflow-y-auto">
-          {{ template "content" . }}
+          {{ .content }}
         </div>
 
 
@@ -921,3 +922,4 @@
     </div>
   </body>
 </html>
+{{ end }}
