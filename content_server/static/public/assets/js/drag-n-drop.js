@@ -1,18 +1,7 @@
-console.log('File loaded');
-
-
-document.body.addEventListener('htmx:load', function() {
-    setupFileDropArea();
-});
-
-window.setupComplete = false
+document.body.removeEventListener('htmx:load', setupFileDropArea)
+document.body.addEventListener('htmx:load', setupFileDropArea);
 
 function setupFileDropArea() {
-    if (window.setupComplete) {
-        console.log("FleDropArea is already set up")
-        return
-    }
-    console.log('Setting up FileDropArea');
     var dropArea = document.getElementById('drop-area');
     if (!dropArea) {
         console.log("No drop area found")
@@ -25,9 +14,7 @@ function setupFileDropArea() {
     }
     var uploadButton = dropArea.querySelector('button');
 
-    uploadButton.addEventListener('click', function(){
-        fileInput.click();
-    });
+    uploadButton.addEventListener('click', fileInput.click);
 
 
     fileInput.addEventListener('change', function() {
