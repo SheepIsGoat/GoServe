@@ -4,39 +4,66 @@ import (
 	"fmt"
 	"log"
 	pg "main/postgres"
+	"strings"
 	"time"
 )
 
 type PieBuilder = ChartBuilder[PieQuery, PieRawData, PieDisplay]
 
+var _ ChartProcessor[PieQuery, PieRawData, PieDisplay] = PieProcessor{}
+
 type PieDisplay struct {
-	Type string `json:"type"`
-	data struct {
-		datasets []pieDatasets
-		labels   []string
-	}
-	options pieOptions
+	Type    string         `json:"type"`
+	Data    pieDisplayData `json:"data"`
+	Options pieOptions     `json:"options"`
+}
+
+type pieDisplayData struct {
+	Datasets []pieDatasets `json:"datasets"`
+	Labels   []string      `json:"labels"`
 }
 
 type pieDatasets struct {
-	data            []int
-	backgroundColor []string
-	label           string
+	Data            []int    `json:"data"`
+	BackgroundColor []string `json:"backgroundColor"`
+	Label           string   `json:"label"`
 }
 
 type pieOptions struct {
-	responsive       bool
-	cutoutPercentage int
-	legend           struct {
-		display bool
+	Responsive       bool      `json:"responsive"`
+	CutoutPercentage int       `json:"cutoutPercentage"`
+	Legend           pieLegend `json:"legend"`
+}
+
+type pieLegend struct {
+	Display bool `json:"display"`
+}
+
+func (pd *PieDisplay) GetLegend() (htmlLegend, error) {
+	legend := htmlLegend{
+		Title: "Invoices",
 	}
+	if len(pd.Data.Datasets) < 1 {
+		return legend, fmt.Errorf("PieDisplay has no data. Cannot get legend")
+	}
+	for idx, label := range pd.Data.Labels {
+		color := pd.Data.Datasets[0].BackgroundColor[idx]
+		legend.Labels = append(
+			legend.Labels,
+			coloredItem{
+				Label:    label,
+				HexColor: color,
+			},
+		)
+	}
+	return legend, nil
 }
 
 var defaultPieOptions = pieOptions{
-	responsive:       true,
-	cutoutPercentage: 80,
-	legend: struct{ display bool }{
-		display: false,
+	Responsive:       true,
+	CutoutPercentage: 80,
+	Legend: pieLegend{
+		Display: false,
 	},
 }
 
@@ -48,12 +75,12 @@ func (pd *PieDisplay) TemplateName() string {
 
 func (pd *PieDisplay) Init() {
 	pd.Type = "doughnut"
-	pd.data.datasets = []pieDatasets{
+	pd.Data.Datasets = []pieDatasets{
 		{
-			label: "Dummy Label",
+			Label: "Dummy Label",
 		},
 	}
-	pd.options = defaultPieOptions
+	pd.Options = defaultPieOptions
 }
 
 type PieQuery struct {
@@ -91,36 +118,31 @@ func (pp PieProcessor) _validateDisplayCast(pd *PieDisplay) ChartDisplay {
 }
 
 func (pp PieProcessor) FetchData(pgContext *pg.PostgresContext, pq PieQuery) ([]PieRawData, error) {
-	// func (pp PieProcessor) FetchData(pgContext *pg.PostgresContext, cqp ChartQueryParams[PieRawData]) (Dummy[PieRawData], error) {
-	// pq, ok := cqp.(PieQuery)
-	// if !ok {
-	// 	return fmt.Errorf("Failed to cast query as PieQuery")
-	// }
-	args := append([]interface{}{}, pq.GroupBy)
+	fmt.Printf("PieQuery: %+v\n", pq)
+	var args []interface{}
 
-	// where := ""
-	// if pq.Time.OrderedCol != "" {
-	// 	where = fmt.Sprintf("WHERE %s > $2 AND %s < $3", pq.Time.OrderedCol, pq.Time.OrderedCol)
-	// 	args = append(args, pq.Time.After, pq.Time.Before)
-	// }
+	where := ""
+	if pq.Time.OrderedCol != "" {
+		where = fmt.Sprintf("WHERE %s > $1 AND %s < $2", pq.Time.OrderedCol, pq.Time.OrderedCol)
+		args = append(args, pq.Time.After, pq.Time.Before)
+	}
 
-	// // cols := pq.Cols
-	// cols := []string{pq.Col}
-	// countCols := make([]string, len(cols))
-	// for i, col := range cols {
-	// 	countCols[i] = fmt.Sprintf("COUNT(t.\"%s\")", strings.TrimSpace(col))
-	// }
+	// cols := pq.Cols
+	cols := []string{pq.Col}
+	countCols := make([]string, len(cols))
+	for i, col := range cols {
+		countCols[i] = fmt.Sprintf("COUNT(t.\"%s\")", strings.TrimSpace(col))
+	}
 
-	// query := fmt.Sprintf(`
-	// SELECT %s
-	// FROM "%s" t
-	// %s
-	// GROUP BY $1
-	// `, strings.Join(countCols, ", "), pq.Table, where)
-	query := `
-	SELECT COUNT(status), status FROM "SampleInvoices" GROUP BY $1
-	`
-
+	Select := fmt.Sprintf(`SELECT %s, %s`, strings.Join(countCols, ", "), pq.GroupBy)
+	from := fmt.Sprintf(`FROM "%s" t`, pq.Table)
+	where = where
+	groupby := fmt.Sprintf(`GROUP BY t."%s"`, pq.GroupBy)
+	query := fmt.Sprintf(`%s %s %s %s`, Select, from, where, groupby)
+	// SELECT COUNT(status), status FROM "SampleInvoices" GROUP BY $1
+	// `
+	fmt.Printf("Pie SQL Query: %v\n", query)
+	fmt.Printf("Pie Args: %v\n", args)
 	var results []PieRawData
 	rows, err := pgContext.Pool.Query(pgContext.Ctx, query, args...)
 	if err != nil {
@@ -152,25 +174,25 @@ func (pp PieProcessor) PopulateDisplay(input []PieRawData) (*PieDisplay, error) 
 	// But the awkwardness makes the typing system safer
 	pd := new(PieDisplay)
 	pd.Init()
-	if len(pd.data.datasets) < 1 {
+	if len(pd.Data.Datasets) < 1 {
 		return pd, fmt.Errorf("PieDisplay.Init() failed to initialize properly")
 	}
 
 	colorPalette := ColorPalettes["Dark-To-Light"]
+	// colors := []string{"teal", "blue", "purple", "white", "green", "red", "orange"}
 	for i, pid := range input {
-		pd.data.datasets[0].data = append(pd.data.datasets[0].data, pid.Data)
+		pd.Data.Datasets[0].Data = append(pd.Data.Datasets[0].Data, pid.Data)
 
 		color := colorPalette[i%len(colorPalette)]
-		pd.data.datasets[0].backgroundColor = append(pd.data.datasets[0].backgroundColor, color.HexCode)
-		pd.data.labels = append(pd.data.labels, pid.Label)
+		pd.Data.Datasets[0].BackgroundColor = append(pd.Data.Datasets[0].BackgroundColor, color.HexCode)
+		pd.Data.Labels = append(pd.Data.Labels, pid.Label)
 	}
 	return pd, nil
 }
 
 type PieRawData struct {
-	Data   int
-	Label  string
-	IthVal int //for cycling colors
+	Data  int
+	Label string
 }
 
 func (pid PieRawData) _isChart() bool { return true }

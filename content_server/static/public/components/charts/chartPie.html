@@ -1,5 +1,6 @@
 {{ define "charts/Pie"}}
       <script>
+        // minor rendering bug - this adds a listener for all pie elements, not just the inteded target
         let isPieSetupComplete = false;
         if (!isPieSetupComplete){
             document.body.addEventListener('htmx:load', configPieChart);
@@ -8,7 +9,7 @@
 
         function configPieChart() {
             const pieCtx = document.getElementById('pie');
-            let pieConfig = {{ . }};
+            let pieConfig = {{ .JSON }};
             if (pieCtx) {
                 window.myPie = new Chart(pieCtx, pieConfig);
             }
@@ -18,31 +19,21 @@
         class="min-w-0 p-4 bg-white rounded-lg shadow-xs dark:bg-gray-800"
       >
         <h4 class="mb-4 font-semibold text-gray-800 dark:text-gray-300">
-          Revenue
+          {{ .Legend.Title }}
         </h4>
         <canvas id="pie"></canvas>
         <div
           class="flex justify-center mt-4 space-x-3 text-sm text-gray-600 dark:text-gray-400"
         >
           <!-- Chart legend -->
+          {{ range .Legend.Labels }}
           <div class="flex items-center">
             <span
-              class="inline-block w-3 h-3 mr-1 bg-blue-500 rounded-full"
+              class="inline-block w-3 h-3 mr-1 rounded-full" style="background-color: {{ .HexColor }};"
             ></span>
-            <span>Shirts</span>
+            <span>{{ .Label }}</span>
           </div>
-          <div class="flex items-center">
-            <span
-              class="inline-block w-3 h-3 mr-1 bg-teal-600 rounded-full"
-            ></span>
-            <span>Shoes</span>
-          </div>
-          <div class="flex items-center">
-            <span
-              class="inline-block w-3 h-3 mr-1 bg-purple-600 rounded-full"
-            ></span>
-            <span>Bags</span>
-          </div>
+          {{ end }}
         </div>
       </div>
 {{ end }}

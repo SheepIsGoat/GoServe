@@ -2,6 +2,7 @@ package charts
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	pg "main/postgres"
@@ -36,7 +37,18 @@ type (
 	ChartDisplay interface {
 		components.DivData //TemplateName() string
 		Init()
+		GetLegend() (htmlLegend, error)
 		_isDisplay() bool
+	}
+
+	htmlLegend struct {
+		Title  string
+		Labels []coloredItem
+	}
+
+	coloredItem struct {
+		Label    string
+		HexColor string
 	}
 )
 
@@ -52,6 +64,7 @@ func (cb ChartBuilder[query, raw, display]) RenderChart(
 		log.Printf("Failed to fetch chart data for %T: %v", chartQuery, err)
 		return err
 	}
+	fmt.Printf("Got chart return data: %+v\n", data)
 
 	_charDisp, err := cb.ChartProcessor.PopulateDisplay(data)
 	if err != nil {
@@ -59,25 +72,26 @@ func (cb ChartBuilder[query, raw, display]) RenderChart(
 		return err
 	}
 	chartDisplay := cb.ChartProcessor._validateDisplayCast(_charDisp)
+	fmt.Printf("Populated chart display: %+v\n", chartDisplay)
 
 	jsonData, err := json.Marshal(chartDisplay)
 	if err != nil {
 		log.Printf("Failed to cast chart input as json for %T: %v", chartQuery, err)
 		return err
 	}
+	fmt.Printf("Jsonified chart display: %v\n", string(jsonData))
+
+	legend, err := chartDisplay.GetLegend()
+	if err != nil {
+		return err
+	}
+
+	templateInput := make(map[string]interface{})
+	templateInput["JSON"] = template.JS(jsonData)
+	templateInput["Legend"] = legend
 
 	templateName := chartDisplay.TemplateName()
-
-	// var buf bytes.Buffer
-	// err = tmpl.ExecuteTemplate(&buf, templateName, jsonData)
-	// if err != nil {
-	// 	log.Printf("Error executing chart template for %s: %v\n", templateName, err)
-	// 	return output, err
-	// }
-
-	// return template.HTML(buf.String()), err
-
-	err = tmpl.ExecuteTemplate(c.Response().Writer, templateName, template.JS(jsonData))
+	err = tmpl.ExecuteTemplate(c.Response().Writer, templateName, templateInput)
 	if err != nil {
 		log.Printf("Error executing chart template: %v\n", err)
 		return err
