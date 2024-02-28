@@ -4,8 +4,8 @@ import (
 	"html/template"
 	"log"
 	pg "main/postgres"
-	"main/tables/cells"
 	"main/tables/pagination"
+	"main/templating/components"
 	"strings"
 )
 
@@ -20,7 +20,7 @@ type Row interface {
 type RowProcessor[T Row] interface {
 	Count(*pg.PostgresContext) (int, error)
 	QuerySQLToStructArray(*pg.PostgresContext, pagination.PaginConfig) ([]T, error)
-	BuildRowCells(T) []cells.TableCell
+	BuildRowCells(T) []components.DivComponent
 	GetHeaders() []string
 }
 
@@ -30,7 +30,7 @@ func (rb *RowBuilder[T]) RenderRow(row T) (template.HTML, error) {
 	var renderedCells strings.Builder
 
 	for _, cell := range rb.RowProcessor.BuildRowCells(row) {
-		renderedHTML, err := cell.RenderCell(rb.Tmpl)
+		renderedHTML, err := cell.RenderComponent(rb.Tmpl)
 		if err != nil {
 			log.Printf("Could not render table cell: %v", err)
 			return "", err

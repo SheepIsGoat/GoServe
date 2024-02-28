@@ -1,30 +1,5 @@
 package cells
 
-import (
-	"bytes"
-	"html/template"
-	"log"
-)
-
-type TableCell struct {
-	Data CellData
-}
-
-type CellData interface {
-	TemplateName() string
-}
-
-func (t *TableCell) RenderCell(tmpl *template.Template) (template.HTML, error) {
-	var buf bytes.Buffer
-	err := tmpl.ExecuteTemplate(&buf, t.Data.TemplateName(), t.Data)
-	if err != nil {
-		log.Printf("Error executing cell template: %v\n", err)
-		return "", err
-	}
-
-	return template.HTML(buf.String()), err
-}
-
 type ProfileCell struct {
 	Avatar string
 	Name   string

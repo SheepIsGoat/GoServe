@@ -39,11 +39,11 @@ Specs:
     - postgres
     - python (for model serving)
 
-Features
 
 ## create your postgres instance
 ```
 chmod +x postgres.sh
+# starts postgres instance, builds tables, populates sample data
 ./postgres.sh
 ```
 
@@ -52,3 +52,10 @@ chmod +x postgres.sh
 go build
 ./main
 ```
+
+
+## Roadmap
+- Graph visualizations
+- Table filters, resizing, etc (UI, already have back end)
+- OAuth
+- 

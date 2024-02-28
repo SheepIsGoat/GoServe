@@ -7,6 +7,7 @@ import (
 
 	"main/tables/cells"
 	"main/tables/pagination"
+	"main/templating/components"
 
 	pg "main/postgres"
 )
@@ -26,34 +27,34 @@ func (arp *AccountRowProcessor) GetHeaders() []string {
 	return []string{"Client", "Amount", "Status", "Date"}
 }
 
-func (arp *AccountRowProcessor) BuildRowCells(ar AccountRow) []cells.TableCell {
+func (arp *AccountRowProcessor) BuildRowCells(ar AccountRow) []components.DivComponent {
 	// populates cells with data based on populated AccountRow struct
-	profile := cells.TableCell{
+	profile := components.DivComponent{
 		Data: cells.ProfileCell{
 			Avatar: ar.ProfileAvatar,
 			Name:   ar.ProfileName,
 			Title:  ar.ProfileTitle,
 		},
 	}
-	amount := cells.TableCell{
+	amount := components.DivComponent{
 		Data: cells.BasicCell{
 			Val: fmt.Sprint(ar.Amount),
 		},
 	}
 	_colorName := cells.StatusColorMap[ar.Status]
 	_colorCss := cells.ColorCssMap[_colorName]
-	status := cells.TableCell{
+	status := components.DivComponent{
 		Data: cells.StatusCell{
 			Status: ar.Status,
 			Color:  _colorCss,
 		},
 	}
-	date := cells.TableCell{
+	date := components.DivComponent{
 		Data: cells.BasicCell{
 			Val: ar.Date.Format("2006-01-02"),
 		},
 	}
-	return []cells.TableCell{profile, amount, status, date}
+	return []components.DivComponent{profile, amount, status, date}
 }
 
 func (arp *AccountRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresContext, pagination pagination.PaginConfig) ([]AccountRow, error) {

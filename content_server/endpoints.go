@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"main/charts"
 	pg "main/postgres"
 	"main/tables"
 	"main/tables/rows"
@@ -142,4 +143,19 @@ func (hCtx *HandlerContext) Table(tmpl *template.Template) error {
 	)
 
 	return table.RenderTable(hCtx.EchoCtx, hCtx.PGCtx, tmpl, processor)
+}
+
+func (hCtx *HandlerContext) PieChart(tmpl *template.Template) error {
+	pieBuilder := charts.PieBuilder{
+		ChartProcessor: charts.PieProcessor{},
+		Tmpl:           tmpl,
+	}
+
+	pieQuery := charts.PieQuery{
+		Table:   "SampleInvoices",
+		Col:     "status",
+		GroupBy: "status",
+	}
+
+	return pieBuilder.RenderChart(hCtx.EchoCtx, hCtx.PGCtx, tmpl, pieQuery)
 }
