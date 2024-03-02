@@ -15,11 +15,12 @@ type RowBuilder[T Row] struct {
 }
 
 type Row interface {
+	_isRow() bool
 }
 
 type RowProcessor[T Row] interface {
-	Count(*pg.PostgresContext) (int, error)
-	QuerySQLToStructArray(*pg.PostgresContext, pagination.PaginConfig) ([]T, error)
+	Count(*pg.PostgresContext, string) (int, error)
+	QuerySQLToStructArray(*pg.PostgresContext, string, pagination.PaginConfig) ([]T, error)
 	BuildRowCells(T) []components.DivComponent
 	GetHeaders() []string
 }
@@ -41,9 +42,9 @@ func (rb *RowBuilder[T]) RenderRow(row T) (template.HTML, error) {
 	return template.HTML(renderedCells.String()), nil
 }
 
-func (rb *RowBuilder[T]) BuildTableData(pgContext *pg.PostgresContext, pagination pagination.PaginConfig) ([]template.HTML, error) {
+func (rb *RowBuilder[T]) BuildTableData(pgContext *pg.PostgresContext, uuid string, pagination pagination.PaginConfig) ([]template.HTML, error) {
 	rows := []template.HTML{}
-	rawData, err := rb.RowProcessor.QuerySQLToStructArray(pgContext, pagination)
+	rawData, err := rb.RowProcessor.QuerySQLToStructArray(pgContext, uuid, pagination)
 	if err != nil {
 		return rows, err
 	}

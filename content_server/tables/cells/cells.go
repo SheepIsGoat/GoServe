@@ -6,7 +6,7 @@ type ProfileCell struct {
 	Title  string
 }
 
-func (p ProfileCell) TemplateName() string {
+func (ProfileCell) TemplateName() string {
 	return "tableCell/profile"
 }
 
@@ -15,7 +15,7 @@ type StatusCell struct {
 	Color  string
 }
 
-func (p StatusCell) TemplateName() string {
+func (StatusCell) TemplateName() string {
 	return "tableCell/status"
 }
 
@@ -38,6 +38,15 @@ type BasicCell struct {
 	Val string
 }
 
-func (p BasicCell) TemplateName() string {
+func (BasicCell) TemplateName() string {
 	return "tableCell/basic"
+}
+
+type ModalCell struct {
+	LinkText     string
+	ModalContent string
+}
+
+func (ModalCell) TemplateName() string {
+	return "tableCell/Modal"
 }

@@ -3,7 +3,7 @@
 CREATE TABLE files (
     unique_filename VARCHAR(255) PRIMARY KEY,
     account_uuid UUID NOT NULL,
-    upload_time BIGINT NOT NULL,
+    upload_time DATE NOT NULL,
     file_ext VARCHAR(10),
     raw_text TEXT,
     bucket_dir VARCHAR(255),

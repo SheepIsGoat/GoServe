@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-type PieBuilder = ChartBuilder[PieQuery, PieRawData, PieDisplay]
+type PieBuilder = ChartBuilder[PieQuery, PieRawData, *PieDisplay]
 
-var _ ChartProcessor[PieQuery, PieRawData, PieDisplay] = PieProcessor{}
+var _ ChartProcessor[PieQuery, PieRawData, *PieDisplay] = PieProcessor{}
 
 type PieDisplay struct {
 	Type    string         `json:"type"`
@@ -100,25 +100,7 @@ func (pq PieQuery) _isQueryParams() bool { return true }
 
 type PieProcessor struct{}
 
-func (pp PieProcessor) _processorType(PieRawData) PieRawData { return PieRawData{} }
-
-func (pp PieProcessor) _validateQueryCast(pq PieQuery) ChartQueryParams {
-	var iface ChartQueryParams = pq
-	return iface
-}
-
-func (pp PieProcessor) _validateRawCast(prd PieRawData) ChartRawData {
-	var iface ChartRawData = prd
-	return iface
-}
-
-func (pp PieProcessor) _validateDisplayCast(pd *PieDisplay) ChartDisplay {
-	var iface ChartDisplay = pd
-	return iface
-}
-
 func (pp PieProcessor) FetchData(pgContext *pg.PostgresContext, pq PieQuery) ([]PieRawData, error) {
-	fmt.Printf("PieQuery: %+v\n", pq)
 	var args []interface{}
 
 	where := ""
@@ -141,8 +123,6 @@ func (pp PieProcessor) FetchData(pgContext *pg.PostgresContext, pq PieQuery) ([]
 	query := fmt.Sprintf(`%s %s %s %s`, Select, from, where, groupby)
 	// SELECT COUNT(status), status FROM "SampleInvoices" GROUP BY $1
 	// `
-	fmt.Printf("Pie SQL Query: %v\n", query)
-	fmt.Printf("Pie Args: %v\n", args)
 	var results []PieRawData
 	rows, err := pgContext.Pool.Query(pgContext.Ctx, query, args...)
 	if err != nil {
@@ -164,7 +144,6 @@ func (pp PieProcessor) FetchData(pgContext *pg.PostgresContext, pq PieQuery) ([]
 		return results, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	log.Printf("Returning pie results %v\n", results)
 	return results, nil
 }
 

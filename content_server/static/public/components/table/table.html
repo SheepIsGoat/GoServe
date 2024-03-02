@@ -1,6 +1,8 @@
 {{ define "table" }}
 <!-- Table -->
-{{ $target := toHTMLID (print "table-content-" .Pagination.Data.TableName) }}
+{{ $endpoint := (print "table?tableName=" .Pagination.Data.TableName) }}
+{{ $target := toHTMLID (print "table-content-" .Pagination.Data.TableName )}}
+
 <div 
   id="{{ $target }}"
 >
@@ -48,7 +50,7 @@
               class="px-3 py-1 rounded-md rounded-l-lg focus:outline-none focus:shadow-outline-purple" 
               aria-label="Previous"
               href="#"
-              hx-get="table?page={{ subuint32 .Pagination.Config.CurrentPage 1 }}"
+              hx-get="{{ $endpoint }}&page={{ subuint32 .Pagination.Config.CurrentPage 1 }}"
               hx-target="#{{ $target }}" 
               hx-swap="outerHTML"
             >
@@ -68,7 +70,7 @@
                 {{ if eq $page (printf "%d" $currentPage) }}px-3 py-1 text-white transition-colors duration-150 bg-purple-600 border border-r-0 border-purple-600 rounded-md focus:outline-none focus:shadow-outline-purple
                 {{ else }}px-3 py-1 rounded-md focus:outline-none focus:shadow-outline-purple{{ end }}"
                 href="#"
-                hx-get="table?page={{ $page }}"
+                hx-get="{{ $endpoint }}&page={{ $page }}"
                 hx-target="#{{ $target }}" 
                 hx-swap="outerHTML"
               >{{ $page }}</a>
@@ -82,7 +84,7 @@
               class="px-3 py-1 rounded-md rounded-r-lg focus:outline-none focus:shadow-outline-purple" 
               aria-label="Next"
               href="#"
-              hx-get="table?page={{ adduint32 .Pagination.Config.CurrentPage 1 }}"
+              hx-get="{{ $endpoint }}&page={{ adduint32 .Pagination.Config.CurrentPage 1 }}"
               hx-target="#{{ $target }}"
               hx-swap="outerHTML"
             >

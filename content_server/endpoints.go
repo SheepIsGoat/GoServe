@@ -103,9 +103,8 @@ func (hCtx *HandlerContext) Upload() error {
 	return successDiv(hCtx.EchoCtx, "Successfully uploaded file")
 }
 
-func (hCtx *HandlerContext) Table(tmpl *template.Template) error {
+func serveTable[R rows.Row](hCtx *HandlerContext, tmpl *template.Template, tableName string, processor rows.RowProcessor[R]) error {
 	// tableName := hCtx.EchoCtx.QueryParam("tableName")
-	tableName := "Account Invoices"
 
 	itemsPerPageStr := hCtx.EchoCtx.QueryParam("itemsPerPage")
 	var err error
@@ -127,13 +126,18 @@ func (hCtx *HandlerContext) Table(tmpl *template.Template) error {
 		}
 	}
 
-	processor := &rows.AccountRowProcessor{}
-	totalRows, err := processor.Count(hCtx.PGCtx)
+	uuid, ok := hCtx.EchoCtx.Get("ID").(string)
+	if !ok {
+		return fmt.Errorf("Could not cast ID claim to string")
+	}
+
+	// processor := &rows.AccountRowProcessor{}
+	totalRows, err := processor.Count(hCtx.PGCtx, uuid)
 	if err != nil {
 		log.Printf("Could not count rows for table %s: %v\n", tableName, err)
 		return err
 	}
-	table := tables.Table[rows.AccountRow]{}
+	table := tables.Table[R]{}
 	table.Pagination.Init(
 		tableName,
 		uint32(totalRows),
@@ -143,6 +147,21 @@ func (hCtx *HandlerContext) Table(tmpl *template.Template) error {
 	)
 
 	return table.RenderTable(hCtx.EchoCtx, hCtx.PGCtx, tmpl, processor)
+}
+
+func Table(hCtx *HandlerContext, tmpl *template.Template) error {
+	tableName := hCtx.EchoCtx.QueryParam("tableName")
+
+	if tableName == "Account Invoices" {
+		processor := rows.AccountRowProcessor{}
+		return serveTable[rows.AccountRow](hCtx, tmpl, tableName, processor)
+	}
+	if tableName == "Files" {
+		processor := rows.FileRowProcessor{}
+		return serveTable[rows.FileRow](hCtx, tmpl, tableName, processor)
+	}
+	fmt.Printf("Invlaid table name: %s\n", tableName)
+	return nil
 }
 
 func (hCtx *HandlerContext) PieChart(tmpl *template.Template) error {

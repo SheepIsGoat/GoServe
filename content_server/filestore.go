@@ -40,7 +40,7 @@ type FileInput struct {
 
 type FileOutput struct {
 	AccountUUID    string
-	UploadTime     int64
+	UploadTime     time.Time
 	UniqueFilename string
 	FileExt        string
 	RawText        string
@@ -94,7 +94,7 @@ func (input FileInput) createFileOutput() (FileOutput, bytes.Buffer, error) {
 		AccountUUID: input.AccountUUID,
 	}
 
-	fileOutput.UploadTime = time.Now().UnixNano()
+	fileOutput.UploadTime = time.Now()
 
 	uniqueFilename := input.getUniqueFilename(fileOutput.UploadTime)
 	fileOutput.UniqueFilename = uniqueFilename
@@ -150,7 +150,7 @@ func (fo FileOutput) writeFile(pgContext *pg.PostgresContext, filesystem Filesys
 	return nil
 }
 
-func (input FileInput) getUniqueFilename(uploadTime int64) string {
+func (input FileInput) getUniqueFilename(uploadTime time.Time) string {
 	return fmt.Sprintf("%s-%v-%s", input.AccountUUID, uploadTime, input.Filename)
 }
 

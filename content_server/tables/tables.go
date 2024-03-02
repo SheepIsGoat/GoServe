@@ -1,6 +1,7 @@
 package tables
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	pg "main/postgres"
@@ -19,8 +20,9 @@ type Table[T rows.Row] struct {
 func (t *Table[T]) CountRows(
 	pgContext *pg.PostgresContext,
 	rowProcessor rows.RowProcessor[T],
+	uuid string,
 ) (int, error) {
-	count, err := rowProcessor.Count(pgContext)
+	count, err := rowProcessor.Count(pgContext, uuid)
 	if err != nil {
 		return 0, err
 	}
@@ -37,7 +39,11 @@ func (t *Table[T]) RenderTable(
 		RowProcessor: rowProcessor,
 		Tmpl:         tmpl,
 	}
-	tableData, err := builder.BuildTableData(pgContext, t.Pagination.Config)
+	uuid, ok := c.Get("ID").(string)
+	if !ok {
+		return fmt.Errorf("uuid is not a string")
+	}
+	tableData, err := builder.BuildTableData(pgContext, uuid, t.Pagination.Config)
 	if err != nil {
 		log.Printf("Error building table data: %v", err)
 		return err

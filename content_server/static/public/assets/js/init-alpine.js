@@ -48,15 +48,28 @@ function data() {
       this.isPagesMenuOpen = !this.isPagesMenuOpen
     },
     // Modal
+    modalContent: true,
     isModalOpen: false,
     trapCleanup: null,
-    openModal() {
+    openModal(event) {
+      var modalContentEscaped = event.target.getAttribute('data-modal-content');
+      // var modalContent = unescapeHtml(modalContentEscaped);
+      // document.getElementById('modal-content').textContent = modalContent;
+      this.modalContent = unescapeHtml(modalContentEscaped);
+
       this.isModalOpen = true
       this.trapCleanup = focusTrap(document.querySelector('#modal'))
     },
     closeModal() {
+      this.modalContent = ''
       this.isModalOpen = false
       this.trapCleanup()
     },
   }
+}
+
+function unescapeHtml(escapedStr) {
+  var div = document.createElement('div');
+  div.innerHTML = escapedStr;
+  return div.textContent;
 }

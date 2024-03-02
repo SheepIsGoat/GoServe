@@ -12,18 +12,15 @@ import (
 )
 
 type (
-	ChartBuilder[query any, raw any, display any] struct {
+	ChartBuilder[query ChartQueryParams, raw ChartRawData, displayPtr ChartDisplay] struct {
 		// Used to create a ChartDisplay object of the specified type, for rendering charts.js
-		ChartProcessor ChartProcessor[query, raw, display]
+		ChartProcessor ChartProcessor[query, raw, displayPtr]
 		Tmpl           *template.Template
 	}
 
-	ChartProcessor[query any, raw any, display any] interface {
+	ChartProcessor[query ChartQueryParams, raw ChartRawData, displayPtr ChartDisplay] interface {
 		FetchData(*pg.PostgresContext, query) ([]raw, error)
-		PopulateDisplay([]raw) (*display, error)
-		_validateQueryCast(query) ChartQueryParams
-		_validateRawCast(raw) ChartRawData
-		_validateDisplayCast(*display) ChartDisplay
+		PopulateDisplay([]raw) (displayPtr, error)
 	}
 
 	ChartQueryParams interface {
@@ -66,20 +63,18 @@ func (cb ChartBuilder[query, raw, display]) RenderChart(
 	}
 	fmt.Printf("Got chart return data: %+v\n", data)
 
-	_charDisp, err := cb.ChartProcessor.PopulateDisplay(data)
+	chartDisplay, err := cb.ChartProcessor.PopulateDisplay(data)
 	if err != nil {
 		log.Printf("Failed to populate display for %T: %v", chartQuery, err)
 		return err
 	}
-	chartDisplay := cb.ChartProcessor._validateDisplayCast(_charDisp)
-	fmt.Printf("Populated chart display: %+v\n", chartDisplay)
+	// chartDisplay := cb.ChartProcessor._validateDisplayCast(_charDisp)
 
 	jsonData, err := json.Marshal(chartDisplay)
 	if err != nil {
 		log.Printf("Failed to cast chart input as json for %T: %v", chartQuery, err)
 		return err
 	}
-	fmt.Printf("Jsonified chart display: %v\n", string(jsonData))
 
 	legend, err := chartDisplay.GetLegend()
 	if err != nil {

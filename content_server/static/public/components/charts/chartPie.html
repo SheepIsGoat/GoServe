@@ -1,11 +1,13 @@
 {{ define "charts/Pie"}}
       <script>
         // minor rendering bug - this adds a listener for all pie elements, not just the inteded target
-        let isPieSetupComplete = false;
-        if (!isPieSetupComplete){
-            document.body.addEventListener('htmx:load', configPieChart);
-            isPieSetupComplete = true;
-        }
+        // also, the chart reloads on every htmx:load event, so it looks bad
+        // let isPieSetupComplete = false;
+        // if (!isPieSetupComplete){
+        //     document.body.addEventListener('htmx:load', configPieChart);
+        //     isPieSetupComplete = true;
+        // }
+        configPieChart()
 
         function configPieChart() {
             const pieCtx = document.getElementById('pie');

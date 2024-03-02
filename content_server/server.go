@@ -124,9 +124,7 @@ func main() {
 
 	app.GET("/table/", func(c echo.Context) error {
 		hCtx := HandlerContext{c, &pg.PostgresContext{pool, context.Background()}}
-		log.Println("Hitting table endpoint")
-		// return tables.RenderTable(c, tmpl)
-		return hCtx.Table(tmpl)
+		return Table(&hCtx, tmpl)
 	}).Name = "index"
 
 	app.GET("/charts/pie/", func(c echo.Context) error {

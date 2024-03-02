@@ -2,6 +2,7 @@ package templating
 
 import (
 	"bytes"
+	"html"
 	"html/template"
 	"main/arithmetic"
 	"strings"
@@ -107,8 +108,13 @@ func toHTMLID(s string) string {
 	return id
 }
 
+func escapeString(s string) string {
+	return html.EscapeString(s)
+}
+
 var funcMap = template.FuncMap{
-	"adduint32": arithmetic.Add[uint32],
-	"subuint32": arithmetic.Sub[uint32],
-	"toHTMLID":  toHTMLID,
+	"adduint32":    arithmetic.Add[uint32],
+	"subuint32":    arithmetic.Sub[uint32],
+	"toHTMLID":     toHTMLID,
+	"escapeString": escapeString,
 }

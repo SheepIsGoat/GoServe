@@ -12,6 +12,8 @@ import (
 	pg "main/postgres"
 )
 
+var _ RowProcessor[AccountRow] = AccountRowProcessor{}
+
 type AccountRow struct {
 	ProfileAvatar string
 	ProfileName   string
@@ -21,13 +23,15 @@ type AccountRow struct {
 	Date          time.Time
 }
 
+func (ar AccountRow) _isRow() bool { return true }
+
 type AccountRowProcessor struct{}
 
-func (arp *AccountRowProcessor) GetHeaders() []string {
+func (arp AccountRowProcessor) GetHeaders() []string {
 	return []string{"Client", "Amount", "Status", "Date"}
 }
 
-func (arp *AccountRowProcessor) BuildRowCells(ar AccountRow) []components.DivComponent {
+func (arp AccountRowProcessor) BuildRowCells(ar AccountRow) []components.DivComponent {
 	// populates cells with data based on populated AccountRow struct
 	profile := components.DivComponent{
 		Data: cells.ProfileCell{
@@ -57,12 +61,13 @@ func (arp *AccountRowProcessor) BuildRowCells(ar AccountRow) []components.DivCom
 	return []components.DivComponent{profile, amount, status, date}
 }
 
-func (arp *AccountRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresContext, pagination pagination.PaginConfig) ([]AccountRow, error) {
+func (arp AccountRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresContext, uuid string, pagination pagination.PaginConfig) ([]AccountRow, error) {
 	// Do we need to generalize ORDER BY?
 	query := `
 	SELECT a.avatar, a.name, a.title, i.amount, i.status, i.date
 	FROM "SampleAccounts" a
 	JOIN "SampleInvoices" i ON a.id = i.account_id
+	WHERE a.id IS NOT NULL
 	ORDER BY i.date DESC
 	LIMIT $1
 	OFFSET $2
@@ -93,7 +98,7 @@ func (arp *AccountRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresCont
 	return results, nil
 }
 
-func (arp *AccountRowProcessor) Count(pgContext *pg.PostgresContext) (int, error) {
+func (arp AccountRowProcessor) Count(pgContext *pg.PostgresContext, uuid string) (int, error) {
 	query := `
 	SELECT COUNT(*)
 	FROM "SampleAccounts" a
