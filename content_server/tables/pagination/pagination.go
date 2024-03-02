@@ -93,8 +93,10 @@ func (p *Pagination) _buildPageList(innerPageRange uint32) {
 func (p *Pagination) _setPageBounds(innerPageRange uint32) {
 	p.Config.ItemsPerPage = max(p.Config.ItemsPerPage, 1)
 	p.Display.TotalPages = (p.Data.ItemTotal + p.Config.ItemsPerPage - 1) / p.Config.ItemsPerPage
-	p.Config.CurrentPage = max(p.Config.CurrentPage, 1)
 	p.Config.CurrentPage = min(p.Config.CurrentPage, p.Display.TotalPages)
+	if p.Config.CurrentPage == 0 {
+		p.Config.CurrentPage = 1
+	}
 	fmt.Printf("Setting currentPage to %v. Total Pages %v\n", p.Config.CurrentPage, p.Display.TotalPages)
 	p.Display.ItemStart = (p.Config.CurrentPage-1)*p.Config.ItemsPerPage + 1
 	p.Display.ItemEnd = min(p.Display.ItemStart+p.Config.ItemsPerPage-1, p.Data.ItemTotal)
