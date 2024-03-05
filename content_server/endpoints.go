@@ -21,6 +21,24 @@ type HandlerContext struct {
 	PGCtx   *pg.PostgresContext
 }
 
+var homeDir string
+var filesystem *LocalStorage
+
+func initFilesystem() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+
+	filesystem = &LocalStorage{
+		StorageClass{
+			Config: FileSystemConfig{
+				BucketDir: filepath.Join(homeDir, "/Documents/GoServer/filesystem"),
+			},
+		},
+	}
+}
+
 func errorDiv(c echo.Context, message string) error {
 	errorMessageTemplate := `
     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -75,24 +93,10 @@ func (hCtx *HandlerContext) loginEndpoint() error {
 	return nil
 }
 
-func (hCtx *HandlerContext) Upload() error {
+func FileUpload(hCtx HandlerContext) error {
 	fileInput, err := _createFileInput(hCtx.EchoCtx)
 	if err != nil {
 		log.Printf("Failed to parse file upload: %v", err)
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Printf("Home directory not found")
-		return err
-	}
-
-	filesystem := &LocalStorage{
-		StorageClass{
-			Config: FileSystemConfig{
-				BucketDir: filepath.Join(homeDir, "/Documents/GoServer/filesystem"),
-			},
-		},
 	}
 
 	err = SaveFile(hCtx.PGCtx, filesystem, fileInput)
@@ -101,6 +105,21 @@ func (hCtx *HandlerContext) Upload() error {
 		return errorDiv(hCtx.EchoCtx, "Failed to upload file")
 	}
 	return successDiv(hCtx.EchoCtx, "Successfully uploaded file")
+}
+
+func FileDelete(hCtx HandlerContext) error {
+	fileId := hCtx.EchoCtx.QueryParam("file_id")
+
+	uuid, ok := hCtx.EchoCtx.Get("ID").(string)
+	if !ok {
+		return fmt.Errorf("Could not cast ID claim to string")
+	}
+	fileObject := FileObject{
+		FileId:      fileId,
+		AccountUUID: uuid,
+	}
+
+	return fileObject.Delete(hCtx.PGCtx, filesystem, false)
 }
 
 func serveTable[R rows.Row](hCtx *HandlerContext, tmpl *template.Template, tableName string, processor rows.RowProcessor[R]) error {

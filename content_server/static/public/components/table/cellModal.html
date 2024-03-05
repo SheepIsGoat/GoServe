@@ -1,8 +1,10 @@
-{{ define "tableCell/Modal"}}
-    <td class="px-4 py-3 text-sm">
+{{ define "tableCell/modal"}}
+    <td class="px-4 py-3 text-sm text-blue-500">
         <a 
             href="#" 
+            data-modal-header="File Raw Text"
             data-modal-content="{{ .ModalContent | escapeString }}" 
+            data-modal-target=""
             @click="openModal"
         >{{ .LinkText }}</a>
     </td>

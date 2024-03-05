@@ -140,7 +140,7 @@
     <!-- Table -->
     <div id="outer-table-content"
       hx-get="table?tableName=Account Invoices"
-      hx-trigger="load"
+      hx-trigger="load, error:loadError"
       hx-target="#outer-table-content"
       hx-swap="innerHTML">
     </div>
@@ -155,7 +155,7 @@
 
       <div id="outer-chart-content-1"
         hx-get="charts/pie"
-        hx-trigger="load"
+        hx-trigger="load, error:loadError"
         hx-target="#outer-chart-content-1"
         hx-swap="innerHTML">
       </div>

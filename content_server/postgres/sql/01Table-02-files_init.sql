@@ -1,8 +1,12 @@
 \c server_db
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE files (
-    unique_filename VARCHAR(255) PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     account_uuid UUID NOT NULL,
+    filepath VARCHAR(255) NOT NULL,
+    filename VARCHAR(255),
     upload_time TIMESTAMP NOT NULL,
     file_ext VARCHAR(10),
     raw_text TEXT,

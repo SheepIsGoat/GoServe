@@ -12,6 +12,7 @@ import (
 )
 
 type FileRow struct {
+	ID         string
 	Filename   string
 	UploadTime time.Time
 	FileExt    string
@@ -53,7 +54,7 @@ func (frp FileRowProcessor) Count(pgContext *pg.PostgresContext, uuid string) (i
 func (frp FileRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresContext, uuid string, pagination pagination.PaginConfig) ([]FileRow, error) {
 	// Do we need to generalize ORDER BY?
 	query := `
-	SELECT f.unique_filename, f.upload_time, f.file_ext, f.raw_text, f.bucket_dir, f.location
+	SELECT f.id, f.filename, f.upload_time, f.file_ext, f.raw_text, f.bucket_dir, f.location
 	FROM "files" f
 	WHERE f.account_uuid = $3
 	LIMIT $1
@@ -71,7 +72,7 @@ func (frp FileRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresContext,
 	var results []FileRow
 	for rows.Next() {
 		var fr FileRow
-		if err := rows.Scan(&fr.Filename, &fr.UploadTime, &fr.FileExt, &fr.RawText, &fr.BucketDir, &fr.Location); err != nil {
+		if err := rows.Scan(&fr.ID, &fr.Filename, &fr.UploadTime, &fr.FileExt, &fr.RawText, &fr.BucketDir, &fr.Location); err != nil {
 			log.Printf("Failed to scan row: %v", err)
 			continue
 		}
@@ -87,6 +88,11 @@ func (frp FileRowProcessor) QuerySQLToStructArray(pgContext *pg.PostgresContext,
 }
 
 func (frp FileRowProcessor) BuildRowCells(fr FileRow) []components.DivComponent {
+	id := components.DivComponent{
+		Data: cells.HiddenCell{
+			Val: fr.ID,
+		},
+	}
 	filename := components.DivComponent{
 		Data: cells.ModalCell{
 			LinkText:     fr.Filename,
@@ -103,9 +109,15 @@ func (frp FileRowProcessor) BuildRowCells(fr FileRow) []components.DivComponent 
 			Val: fr.UploadTime.Format("2006-01-02 15:04:05"),
 		},
 	}
-	return []components.DivComponent{filename, extension, uploadTime}
+	trashCan := components.DivComponent{
+		Data: cells.TrashCell{
+			Filename: fr.Filename,
+			FileId:   fr.ID,
+		},
+	}
+	return []components.DivComponent{id, filename, extension, uploadTime, trashCan}
 }
 
 func (frp FileRowProcessor) GetHeaders() []string {
-	return []string{"File", "Extension", "Upload Time"}
+	return []string{"File", "Extension", "Upload Time", ""}
 }

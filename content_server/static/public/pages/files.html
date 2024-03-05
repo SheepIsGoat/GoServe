@@ -93,7 +93,7 @@
       <!-- Table -->
       <div id="outer-table-content"
         hx-get="table?tableName=Files"
-        hx-trigger="load"
+        hx-trigger="load, error:loadError"
         hx-target="#outer-table-content"
         hx-swap="innerHTML">
       </div>

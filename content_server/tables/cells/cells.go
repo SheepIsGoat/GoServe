@@ -48,5 +48,22 @@ type ModalCell struct {
 }
 
 func (ModalCell) TemplateName() string {
-	return "tableCell/Modal"
+	return "tableCell/modal"
+}
+
+type TrashCell struct {
+	Filename string
+	FileId   string
+}
+
+func (TrashCell) TemplateName() string {
+	return "tableCell/trash"
+}
+
+type HiddenCell struct {
+	Val string
+}
+
+func (HiddenCell) TemplateName() string {
+	return "tableCell/hidden"
 }

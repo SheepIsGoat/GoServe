@@ -23,8 +23,9 @@ var TemplatesPath = StaticPath + "/*/*.html"
 func main() {
 
 	// videoID := "kHuX4huT1sc"
-
 	// tube.Download(videoID)
+
+	initFilesystem()
 
 	// setup
 	e := echo.New()
@@ -117,9 +118,14 @@ func main() {
 	}).Name = "index"
 
 	// endpoints
-	app.POST("/upload/", func(c echo.Context) error {
+	app.POST("/files/upload/", func(c echo.Context) error {
 		hCtx := HandlerContext{c, &pg.PostgresContext{pool, context.Background()}}
-		return hCtx.Upload()
+		return FileUpload(hCtx)
+	}).Name = "index"
+
+	app.POST("/files/delete/", func(c echo.Context) error {
+		hCtx := HandlerContext{c, &pg.PostgresContext{pool, context.Background()}}
+		return FileDelete(hCtx)
 	}).Name = "index"
 
 	app.GET("/table/", func(c echo.Context) error {

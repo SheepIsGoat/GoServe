@@ -39,7 +39,7 @@ function handleFiles(files) {
 }
 
 function uploadFile(file) {
-    var url = '/app/upload';
+    var url = '/app/files/upload';
     var formData = new FormData();
     formData.append('file', file);
 

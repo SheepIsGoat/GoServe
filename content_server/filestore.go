@@ -38,18 +38,18 @@ type FileInput struct {
 	File        io.Reader // optional, can be empty
 }
 
-type FileOutput struct {
-	AccountUUID    string
-	UploadTime     time.Time
-	UniqueFilename string
-	FileExt        string
-	RawText        string
+type FileObject struct {
+	FileId      string
+	Filepath    string
+	AccountUUID string
+	UploadTime  time.Time
+	Filename    string
+	FileExt     string
+	RawText     string
 }
 
 func _createFileInput(c echo.Context) (FileInput, error) {
-	fileInput := FileInput{
-		Filename: "MyFile.txt",
-	}
+	fileInput := FileInput{}
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -58,6 +58,7 @@ func _createFileInput(c echo.Context) (FileInput, error) {
 	if file == nil {
 		return fileInput, echo.NewHTTPError(http.StatusBadRequest, "No file in request")
 	}
+	fileInput.Filename = file.Filename
 
 	src, err := file.Open()
 	if err != nil {
@@ -89,15 +90,14 @@ func SaveFile(pgContext *pg.PostgresContext, filesystem Filesystem, fileInput Fi
 	return fileOutput.writeFile(pgContext, filesystem, buf)
 }
 
-func (input FileInput) createFileOutput() (FileOutput, bytes.Buffer, error) {
-	fileOutput := FileOutput{
+func (input FileInput) createFileOutput() (FileObject, bytes.Buffer, error) {
+	fileOutput := FileObject{
 		AccountUUID: input.AccountUUID,
 	}
 
+	fileOutput.Filename = input.Filename
 	fileOutput.UploadTime = time.Now()
-
-	uniqueFilename := input.getUniqueFilename(fileOutput.UploadTime)
-	fileOutput.UniqueFilename = uniqueFilename
+	fileOutput.Filepath = constructUniqueFilename(input.AccountUUID, fileOutput.UploadTime, input.Filename)
 
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(input.File)
@@ -114,7 +114,7 @@ func (input FileInput) createFileOutput() (FileOutput, bytes.Buffer, error) {
 	rawText := input.RawText
 	if rawText == "" {
 		if buf.Len() > 0 {
-			rawText, err = extractText(bytes.NewReader(buf.Bytes()), ext)
+			rawText, err = extractText(buf, ext)
 			if err != nil {
 				return fileOutput, buf, err
 			}
@@ -126,32 +126,75 @@ func (input FileInput) createFileOutput() (FileOutput, bytes.Buffer, error) {
 	return fileOutput, buf, nil
 }
 
-func (fo FileOutput) writeFile(pgContext *pg.PostgresContext, filesystem Filesystem, buf bytes.Buffer) error {
-	err := indexFile(pgContext, filesystem, fo)
+func (fo FileObject) writeFile(pgContext *pg.PostgresContext, filesystem Filesystem, buf bytes.Buffer) error {
+	err := fo.Index(pgContext, filesystem)
 	if err != nil {
 		log.Printf("Error inserting file to table %v, %v", fo, err)
 		return err
 	}
 
-	err = filesystem.Write(bytes.NewReader(buf.Bytes()), fo.UniqueFilename)
+	err = filesystem.Write(bytes.NewReader(buf.Bytes()), fo.Filepath)
 	if err != nil {
-		// Not atomic since it uses a filesystem and a database!
-		delErr := filesystem.Delete(fo.UniqueFilename)
-		if delErr != nil {
-			log.Printf("Failed to delete file after write error: %v", delErr)
-		}
-		dbErr := deleteFileRecord(pgContext, fo.UniqueFilename)
-		if dbErr != nil {
-			log.Printf("Failed to delete database record after write error: %v", dbErr)
-		}
-		return fmt.Errorf("failed to write file: %w", err)
+		return fo.Delete(pgContext, filesystem, true)
 	}
 
 	return nil
 }
 
-func (input FileInput) getUniqueFilename(uploadTime time.Time) string {
-	return fmt.Sprintf("%s-%v-%s", input.AccountUUID, uploadTime, input.Filename)
+func (fo FileObject) Delete(pgContext *pg.PostgresContext, filesystem Filesystem, force bool) error {
+	if fo.Filepath == "" {
+		sqlStatement := `SELECT filepath FROM files WHERE id = $1`
+
+		rows, err := pgContext.Pool.Query(pgContext.Ctx, sqlStatement, fo.FileId)
+		if err != nil {
+			return fmt.Errorf("query execution error: %w", err)
+		}
+		defer rows.Close()
+
+		var filepath string
+		if rows.Next() {
+			err = rows.Scan(&filepath)
+			if err != nil {
+				log.Printf("Failed to scan row: %v", err)
+				return err
+			}
+		}
+		fo.Filepath = filepath
+	}
+	var delErr error
+	if fo.Filepath == "" {
+		delErr = fmt.Errorf("No filepath specified, cannot delete file %s", fo.Filename)
+	} else {
+		delErr = filesystem.Delete(fo.Filepath)
+	}
+	if delErr != nil {
+		log.Printf("Failed to delete file from disk: %v", delErr)
+		if !force {
+			return delErr
+		}
+	}
+	dbErr := deleteFileRecord(pgContext, fo.FileId)
+	if dbErr != nil {
+		log.Printf("Failed to delete database record: %v", dbErr)
+		return dbErr
+	}
+	if delErr != nil && force {
+		return delErr
+	}
+	return nil
+}
+
+func deleteFileRecord(pgContext *pg.PostgresContext, fileId string) error {
+	sqlStatement := `DELETE FROM files WHERE id = $1`
+	_, err := pgContext.Pool.Exec(pgContext.Ctx, sqlStatement, fileId)
+	if err != nil {
+		return fmt.Errorf("error deleting file record: %w", err)
+	}
+	return nil
+}
+
+func constructUniqueFilename(accountUUID string, uploadTime time.Time, filename string) string {
+	return fmt.Sprintf("%s-%v-%s", accountUUID, uploadTime, filename)
 }
 
 func getFileExt(filename string) (string, error) {
@@ -162,54 +205,46 @@ func getFileExt(filename string) (string, error) {
 	return ext, nil
 }
 
-func extractText(file io.Reader, ext string) (string, error) {
-	// Pseudocode, as implementation depends on file type and libraries used
+func extractText(buf bytes.Buffer, ext string) (string, error) {
 	switch ext {
 	case ".txt":
-		return readTxt(file)
+		return readTxt(buf)
 	case ".pdf":
-		// Use a PDF library to extract text
+		return readPdf(buf)
 	case ".doc", ".docx":
-		// Use a library to extract text from Word documents
+		// Use a library or microservice to extract text from Word documents
 	default:
 		return "", fmt.Errorf("unsupported file extension")
 	}
 	return "Extracted text", nil
 }
 
-func indexFile(pgContext *pg.PostgresContext, filesystem Filesystem, details FileOutput) error {
+func (fo FileObject) Index(pgContext *pg.PostgresContext, filesystem Filesystem) error {
 	storageClass := filesystem.GetStorageClass()
 	sqlStatement := `
 	INSERT INTO files (
-		unique_filename, 
+		filename,
+		filepath,
 		account_uuid, 
 		upload_time, 
 		file_ext, 
 		raw_text, 
 		bucket_dir, 
 		location
-	) VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 	_, err := pgContext.Pool.Exec(
 		pgContext.Ctx,
 		sqlStatement,
-		details.UniqueFilename,
-		details.AccountUUID,
-		details.UploadTime,
-		details.FileExt,
-		details.RawText,
+		fo.Filename,
+		fo.Filepath,
+		fo.AccountUUID,
+		fo.UploadTime,
+		fo.FileExt,
+		fo.RawText,
 		storageClass.Config.BucketDir,
 		filesystem.GetLocation(),
 	)
 	return err
-}
-
-func deleteFileRecord(pgContext *pg.PostgresContext, uniqueFilename string) error {
-	sqlStatement := `DELETE FROM files WHERE storage_filename = $1`
-	_, err := pgContext.Pool.Exec(pgContext.Ctx, sqlStatement, uniqueFilename)
-	if err != nil {
-		return fmt.Errorf("error deleting file record: %w", err)
-	}
-	return nil
 }
 
 type LocalStorage struct {

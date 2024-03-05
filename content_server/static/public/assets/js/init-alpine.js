@@ -49,13 +49,19 @@ function data() {
     },
     // Modal
     modalContent: true,
+    modalTarget: "",
     isModalOpen: false,
     trapCleanup: null,
     openModal(event) {
-      var modalContentEscaped = event.target.getAttribute('data-modal-content');
-      // var modalContent = unescapeHtml(modalContentEscaped);
-      // document.getElementById('modal-content').textContent = modalContent;
+      event.preventDefault();
+      let targetElement = event.target;
+      if (targetElement.tagName.toLowerCase() !== 'a') {
+          targetElement = targetElement.closest('a');
+      }
+      var modalContentEscaped = targetElement.getAttribute('data-modal-content');
       this.modalContent = unescapeHtml(modalContentEscaped);
+
+      this.modalTarget = targetElement.getAttribute('data-modal-target');
 
       this.isModalOpen = true
       this.trapCleanup = focusTrap(document.querySelector('#modal'))
