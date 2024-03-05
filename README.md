@@ -55,7 +55,16 @@ go build
 
 
 ## Roadmap
-- Graph visualizations
 - Table filters, resizing, etc (UI, already have back end)
+- - Use invisible div to keep track of current table filters? Or a form?
 - OAuth
-- 
+- - Google, GitHub
+- File download
+- - Need download tableCell
+- Add S3 support
+- ChatGPT prompting microservice
+- Standardizing error alerts better
+- Reorganizing code
+- https & nginx
+- docker-compose for whole project
+- cloudformation for whole project
